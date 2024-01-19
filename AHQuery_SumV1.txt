@@ -1,5 +1,5 @@
-let start_time = datetime($($QueryStartDate)); 
-let end_time = datetime($($QueryEndDate)); 
+let start_time = datetime(QueryStartDate); 
+let end_time = datetime(QueryEndDate); 
 let Reports = CloudAppEvents  
 | where Timestamp between (start_time .. end_time)
 | where ActionType == "UserSubmission" or ActionType == "AdminSubmission"
