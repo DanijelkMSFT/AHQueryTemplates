@@ -1,0 +1,43 @@
+let start_time = datetime($($QueryStartDate)); 
+let end_time = datetime($($QueryEndDate)); 
+let Reports = CloudAppEvents  
+| where Timestamp between (start_time .. end_time)
+| where ActionType == "UserSubmission" or ActionType == "AdminSubmission"
+| extend MessageDate = todatetime((parse_json(RawEventData)).MessageDate)
+| extend NetworkMessageID = tostring((parse_json(RawEventData)).ObjectId)
+| extend Date_value = tostring(format_datetime( MessageDate, "yyyy-MM-dd"))
+| distinct Date_value,NetworkMessageID
+| summarize count() by Date_value
+| project Date_value, MessagesGotReported=count_;
+let DeliveryInboundEvents = (EmailEvents | where EmailDirection == "Inbound" | project Timestamp, ThreatTypes,NetworkMessageId);
+let PostDeliveryEvents = (EmailPostDeliveryEvents | where ActionType contains "ZAP" | join DeliveryInboundEvents on NetworkMessageId
+| extend Date_value = tostring(format_datetime( Timestamp1, "yyyy-MM-dd"))
+| summarize PostDeliveryZAP=count() by Date_value);
+let DeliveryByThreat = (DeliveryInboundEvents
+| where Timestamp between (start_time .. end_time)
+| extend Date_value = tostring(format_datetime( Timestamp, "yyyy-MM-dd"))
+| summarize count() by Date_value, ThreatTypes);
+let DeliveryTotal = (DeliveryInboundEvents
+| where Timestamp between (start_time .. end_time)
+| extend Date_value = tostring(format_datetime( Timestamp, "yyyy-MM-dd"))
+| summarize DeliveryTotal=count() by Date_value);
+let DeliveryCatchPhish = DeliveryByThreat | distinct Date_value
+| join kind = fullouter (DeliveryByThreat | where ThreatTypes contains "Phish") on Date_value | summarize sum(count_) by Date_value | project Date_value,DeliveryCatchPhish=sum_count_;
+let DeliveryCatchSpam = DeliveryByThreat | distinct Date_value
+| join kind = fullouter (DeliveryByThreat | where ThreatTypes contains "Spam") on Date_value | summarize sum(count_) by Date_value | project Date_value,DeliveryCatchSpam=sum_count_;
+let DeliveryCatchMalware = DeliveryByThreat | distinct Date_value
+| join kind = fullouter (DeliveryByThreat | where ThreatTypes contains "Malware") on Date_value | summarize sum(count_) by Date_value | project Date_value,DeliveryCatchMalware=sum_count_;
+let DeliveryClean = DeliveryByThreat | distinct Date_value
+| join kind = fullouter (DeliveryByThreat | where isempty(ThreatTypes)) on Date_value | summarize sum(count_) by Date_value | project Date_value,DeliveryClean=sum_count_;
+DeliveryByThreat
+| join DeliveryCatchPhish on Date_value
+| join DeliveryCatchSpam on Date_value
+| join DeliveryCatchMalware on Date_value
+| join DeliveryClean on Date_value
+| join DeliveryTotal on Date_value
+| join kind=fullouter PostDeliveryEvents on Date_value
+| join kind=fullouter Reports on Date_value
+| sort by Date_value
+| extend Date_value = todatetime(Date_value)
+| project Date_value,DeliveryTotal,DeliveryClean, DeliveryCatchPhish, DeliveryCatchSpam, DeliveryCatchMalware, MessagesGotReported, PostDeliveryZAP
+| where isnotempty(Date_value)
