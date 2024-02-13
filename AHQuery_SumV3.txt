@@ -62,6 +62,6 @@ DeliveryByThreat
 | join kind=fullouter TopTargetedUsers on Date_value
 | join kind=fullouter OrgLevelOverrides on Date_value
 | sort by Date_value asc
-| project Date_value, TotalEmails, Clean, Malware, Phish, Spam, Bulk, MessagesGotReported, PostDeliveryZAP, TotalInvestigations, NoThreatsFound, Malicious, Suspicious,TopUsers,OrgLevelAllowAction
+| project Date_value, EmailDirection, TotalEmails, Clean, Malware, Phish, Spam, Bulk, MessagesGotReported, PostDeliveryZAP, TotalInvestigations, NoThreatsFound, Malicious, Suspicious,TopUsers,OrgLevelAllowAction
 | where isnotempty(Date_value) // As Reports from CloudAppEvents Submissions could contain messages submitted before 30 days it is good to remove all > 30 days, otherwise EMailEvents wouldn't have a date
 
