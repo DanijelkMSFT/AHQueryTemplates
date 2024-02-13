@@ -38,7 +38,10 @@ let DeliveryByThreat = (DeliveryEvents
             Phish = countif(FirstSubcategory contains "Phish"),
             Spam = countif(FirstSubcategory contains "Spam" and FirstSubcategory !contains "Bulk"),
             Bulk = countif(FirstSubcategory contains "Bulk")
-            by Date_value,EmailDirection;
+            by Date_value,EmailDirection
+| extend DetectionSummaryBundle = bag_pack_columns(EmailDirection,TotalEmails,Clean,Malware,Phish,Spam,Bulk)
+| project Date_value,DetectionSummaryBundle
+| summarize DetectionSummary = make_set(DetectionSummaryBundle) by Date_value;            
 let Threat_Type = dynamic(["Malware","Phish"]);
 let TopTargetedUsers = ( EmailEvents
 | where EmailDirection in (MailDirection) and Timestamp between (start_time .. end_time)
@@ -70,6 +73,6 @@ DeliveryByThreat
 | join kind=fullouter OrgLevelOverrides on Date_value
 | join kind=fullouter MailDeliveryLocation on Date_value
 | sort by Date_value asc
-| project Date_value,AllDeliveryLocations, Top15Users,EmailDirection, TotalEmails, Clean, Malware, Phish, Spam, Bulk, MessagesGotReported, PostDeliveryZAP, TotalInvestigations, NoThreatsFound, Malicious, Suspicious,OrgLevelAllowAction
+| project Date_value,DetectionSummary,AllDeliveryLocations, Top15Users,MessagesGotReported, PostDeliveryZAP, TotalInvestigations, NoThreatsFound, Malicious, Suspicious,OrgLevelAllowAction
 | where isnotempty(Date_value) // As Reports from CloudAppEvents Submissions could contain messages submitted before 30 days it is good to remove all > 30 days, otherwise EMailEvents wouldn't have a date
 
