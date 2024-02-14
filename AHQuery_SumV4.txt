@@ -57,8 +57,10 @@ let OrgLevelOverrides = ( EmailEvents
 | where  Timestamp between (start_time .. end_time) and isnotempty(ThreatTypes)
 | where DeliveryLocation == "Inbox/folder"  and OrgLevelAction == "Allow" 
 | extend Date_value = tostring(format_datetime(Timestamp, "yyyy-MM-dd"))
-| summarize OrgLevelAllowAction = count()
-            by Date_value);
+| summarize count() by Date_value,OrgLevelAction,OrgLevelPolicy,UserLevelAction,UserLevelPolicy
+| extend OrglLevelOverrideBundle = bag_pack_columns(OrgLevelAction,OrgLevelPolicy,UserLevelAction,UserLevelPolicy,count_)
+| project Date_value,OrglLevelOverrideBundle
+| summarize AllOrglLevelOverrides = make_set(OrglLevelOverrideBundle) by Date_value);
 let MailDeliveryLocation = ( EmailEvents
 | extend Date_value = tostring(format_datetime( Timestamp, "yyyy-MM-dd"))
 | summarize count() by Date_value,DeliveryLocation
@@ -73,6 +75,5 @@ DeliveryByThreat
 | join kind=fullouter OrgLevelOverrides on Date_value
 | join kind=fullouter MailDeliveryLocation on Date_value
 | sort by Date_value asc
-| project Date_value,DetectionSummary,AllDeliveryLocations, Top15Users,MessagesGotReported, PostDeliveryZAP, TotalInvestigations, NoThreatsFound, Malicious, Suspicious,OrgLevelAllowAction
+| project Date_value,AllOrglLevelOverrides,DetectionSummary,AllDeliveryLocations, Top15Users,MessagesGotReported, PostDeliveryZAP, TotalInvestigations, NoThreatsFound, Malicious, Suspicious
 | where isnotempty(Date_value) // As Reports from CloudAppEvents Submissions could contain messages submitted before 30 days it is good to remove all > 30 days, otherwise EMailEvents wouldn't have a date
-
